@@ -1,26 +1,26 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SimulatorApp } from "@/components/sim/SimulatorApp";
 
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "MicroSteady · Tremor Cancellation Simulator" },
+      {
+        name: "description",
+        content:
+          "Interactive microsurgery tremor-cancellation simulator: PID + notch filtering of 8–12 Hz physiological hand tremor, controlled by your mouse.",
+      },
+      { property: "og:title", content: "MicroSteady · Tremor Cancellation Simulator" },
+      {
+        property: "og:description",
+        content:
+          "Move your mouse to perform virtual microsurgery while a PID + 2nd-order notch filter cancels simulated 8–12 Hz hand tremor in real time.",
+      },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. For sites with multiple pages (About, Services, Contact, etc.),
-// create separate route files (about.tsx, services.tsx, contact.tsx) — don't put all pages in this file.
-function PlaceholderIndex() {
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
-  );
-}
-
 function Index() {
-  return <PlaceholderIndex />;
+  return <SimulatorApp />;
 }
