@@ -45,6 +45,8 @@ export interface UseSimulatorReturn {
   path: PathPoint[];
   resetTrails: () => void;
   isTracking: boolean;
+  /** Snapshot of the in-flight ring buffer of recent samples. */
+  getRecentSamples: () => SimSample[];
 }
 
 export function useSimulator(): UseSimulatorReturn {
@@ -53,9 +55,10 @@ export function useSimulator(): UseSimulatorReturn {
     tremorAmp: 8,
     tremorFreq: 10,
     tremorNoise: 1.2,
-    kp: 6,
-    ki: 1.5,
-    kd: 0.08,
+    // Defaults from the IITK paper / accompanying control.py notebook
+    kp: 350,
+    ki: 50,
+    kd: 60,
     notchHz: 10,
     notchZeta: 0.05,
     mode: "pid_notch",
@@ -261,6 +264,7 @@ export function useSimulator(): UseSimulatorReturn {
   return {
     params, setParams, canvasRef, history, fftTremor, fftFiltered, metrics, path,
     resetTrails, isTracking,
+    getRecentSamples: () => trailRef.current.slice(),
   };
 }
 

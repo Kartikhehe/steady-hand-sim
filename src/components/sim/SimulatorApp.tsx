@@ -1,12 +1,32 @@
 import { useSimulator, SAMPLE_RATE } from "@/hooks/useSimulator";
+import { useTaskRunner, TASK_LABEL } from "@/hooks/useTaskRunner";
 import { ControlsPanel } from "./ControlsPanel";
 import { MetricsPanel } from "./MetricsPanel";
 import { ErrorChart } from "./ErrorChart";
 import { FFTChart } from "./FFTChart";
 import { Header } from "./Header";
+import { TaskPanel } from "./TaskPanel";
+
+const MODE_DESC: Record<string, string> = {
+  off: "Open Loop · No Stabilization",
+  pid: "Closed Loop · PID Active",
+  pid_notch: "Closed Loop · PID + Notch",
+};
 
 export function SimulatorApp() {
   const sim = useSimulator();
+  const runner = useTaskRunner(sim);
+
+  const taskHint =
+    runner.phase === "idle"
+      ? "Pick a task on the right and press Start to begin."
+      : runner.phase === "countdown"
+      ? `Get ready — ${TASK_LABEL[runner.task]} (${runner.remaining}s)`
+      : runner.phase === "running"
+      ? `${TASK_LABEL[runner.task]} — ${runner.remaining}s left`
+      : runner.phase === "between"
+      ? "Switching controller… keep your mouse on the field."
+      : "All trials complete — review the comparison on the right.";
 
   return (
     <div className="min-h-screen p-3 sm:p-5 flex flex-col gap-4">
@@ -14,7 +34,7 @@ export function SimulatorApp() {
 
       <div className="grid gap-4 flex-1 min-h-0
                       grid-cols-1
-                      lg:grid-cols-[300px_minmax(0,1fr)_360px]">
+                      lg:grid-cols-[300px_minmax(0,1fr)_380px]">
         {/* Left: controls */}
         <ControlsPanel
           params={sim.params}
@@ -34,10 +54,8 @@ export function SimulatorApp() {
                 Operating Field
               </div>
               <div className="text-sm font-semibold">
-                {sim.params.mode === "off" && "Open Loop · No Stabilization"}
-                {sim.params.mode === "pid" && "Closed Loop · PID Active"}
-                {sim.params.mode === "pid_notch" &&
-                  `Closed Loop · PID + Notch @ ${sim.params.notchHz.toFixed(1)} Hz`}
+                {MODE_DESC[sim.params.mode]}
+                {sim.params.mode === "pid_notch" && ` @ ${sim.params.notchHz.toFixed(1)} Hz`}
               </div>
             </div>
             <Legend />
@@ -56,18 +74,46 @@ export function SimulatorApp() {
               ref={sim.canvasRef}
               className="absolute inset-0 w-full h-full cursor-crosshair"
             />
+
+            {/* Task hint banner — top */}
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none">
+              <div className="glass-panel-sm px-3 py-1.5 text-[11px] text-foreground/90 whitespace-nowrap max-w-[90vw] sm:max-w-none">
+                {taskHint}
+              </div>
+            </div>
+
+            {/* Active trial badge */}
+            {runner.phase === "running" && runner.activeMode && (
+              <div className="absolute top-3 right-3 pointer-events-none">
+                <div
+                  className="px-3 py-1.5 rounded-md text-[11px] font-semibold uppercase tracking-wider"
+                  style={{
+                    background: runner.activeMode === "off"
+                      ? "color-mix(in oklab, oklch(0.68 0.22 25) 25%, transparent)"
+                      : runner.activeMode === "pid"
+                      ? "color-mix(in oklab, oklch(0.85 0.16 85) 25%, transparent)"
+                      : "color-mix(in oklab, oklch(0.78 0.18 145) 25%, transparent)",
+                    border: "1px solid color-mix(in oklab, currentColor 30%, transparent)",
+                  }}
+                >
+                  Trial {runner.trialIndex + 1}/{runner.totalTrials} · {runner.activeMode === "pid_notch" ? "PID+Notch" : runner.activeMode === "pid" ? "PID" : "Off"}
+                </div>
+              </div>
+            )}
+
             {!sim.isTracking && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="glass-panel-sm px-4 py-2 text-xs text-muted-foreground">
-                  Move your mouse over the field to begin the procedure
+                  Move your mouse over the field to begin
                 </div>
               </div>
             )}
           </div>
         </section>
 
-        {/* Right: telemetry */}
-        <aside className="flex flex-col gap-4 min-h-0">
+        {/* Right: task + telemetry */}
+        <aside className="flex flex-col gap-4 min-h-0 overflow-y-auto">
+          <TaskPanel runner={runner} />
           <MetricsPanel metrics={sim.metrics} />
           <ErrorChart history={sim.history} />
           <FFTChart
@@ -109,3 +155,4 @@ function Legend() {
     </div>
   );
 }
+

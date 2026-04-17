@@ -38,9 +38,13 @@ export class PIDController {
     const deriv = (err - this.prevErr) / this.dt;
     this.prevErr = err;
     const u = this.kp * err + this.ki * this.integ + this.kd * deriv;
-    // Treat control output as additive correction to measured signal
-    return measured + u * this.dt;
+    // Apply control as a small position correction. Scale chosen so that the
+    // paper's tuned gains (Kp=350, Ki=50, Kd=60) behave reasonably in
+    // screen-pixel units at 120 Hz against an M=1 plant.
+    return measured + u * this.dt * PIDController.GAIN_SCALE;
   }
+
+  static GAIN_SCALE = 1 / 60;
 }
 
 // Second-order IIR notch filter via bilinear transform.
