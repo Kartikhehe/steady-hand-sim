@@ -29,14 +29,18 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "ME354 project" },
+      { name: "description", content: "Simulates microsurgery with tremor cancellation, stabilizing mouse input for precise control." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "ME354 project" },
+      { property: "og:description", content: "Simulates microsurgery with tremor cancellation, stabilizing mouse input for precise control." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "ME354 project" },
+      { name: "twitter:description", content: "Simulates microsurgery with tremor cancellation, stabilizing mouse input for precise control." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/8de3a8e3-1f1e-48c6-b356-bb6760413111/id-preview-3bf5113c--2fe9f471-9417-4357-9932-ad9f08f397b9.lovable.app-1776430107442.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/8de3a8e3-1f1e-48c6-b356-bb6760413111/id-preview-3bf5113c--2fe9f471-9417-4357-9932-ad9f08f397b9.lovable.app-1776430107442.png" },
     ],
     links: [
       {
