@@ -120,12 +120,15 @@ export function ControlsPanel({ params, setParams, onReset }: Props) {
         <Label className="text-xs uppercase tracking-wider text-muted-foreground">
           PID Gains
         </Label>
-        <Row label="Kp" value={params.kp} min={0} max={20} step={0.1}
+        <Row label="Kp" value={params.kp} min={0} max={800} step={5}
           onChange={(v) => setParams({ kp: v })} />
-        <Row label="Ki" value={params.ki} min={0} max={10} step={0.1}
+        <Row label="Ki" value={params.ki} min={0} max={200} step={1}
           onChange={(v) => setParams({ ki: v })} />
-        <Row label="Kd" value={params.kd} min={0} max={1} step={0.01}
+        <Row label="Kd" value={params.kd} min={0} max={200} step={1}
           onChange={(v) => setParams({ kd: v })} />
+        <p className="text-[10px] text-muted-foreground/80 leading-snug">
+          Reference (IITK paper): Kp=350, Ki=50, Kd=60 — tuned for 8–12 Hz attenuation on M=1, C=5, K=100 plant.
+        </p>
       </section>
 
       {/* Notch */}

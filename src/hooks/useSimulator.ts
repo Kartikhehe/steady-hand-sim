@@ -53,9 +53,10 @@ export function useSimulator(): UseSimulatorReturn {
     tremorAmp: 8,
     tremorFreq: 10,
     tremorNoise: 1.2,
-    kp: 6,
-    ki: 1.5,
-    kd: 0.08,
+    // Defaults from the IITK paper / accompanying control.py notebook
+    kp: 350,
+    ki: 50,
+    kd: 60,
     notchHz: 10,
     notchZeta: 0.05,
     mode: "pid_notch",
