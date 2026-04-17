@@ -45,6 +45,8 @@ export interface UseSimulatorReturn {
   path: PathPoint[];
   resetTrails: () => void;
   isTracking: boolean;
+  /** Snapshot of the in-flight ring buffer of recent samples. */
+  getRecentSamples: () => SimSample[];
 }
 
 export function useSimulator(): UseSimulatorReturn {
@@ -262,6 +264,7 @@ export function useSimulator(): UseSimulatorReturn {
   return {
     params, setParams, canvasRef, history, fftTremor, fftFiltered, metrics, path,
     resetTrails, isTracking,
+    getRecentSamples: () => trailRef.current.slice(),
   };
 }
 
