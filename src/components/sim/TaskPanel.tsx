@@ -22,7 +22,10 @@ const MODE_SHORT: Record<ControllerMode, string> = {
 };
 
 export function TaskPanel({ runner }: { runner: UseTaskRunnerReturn }) {
-  const { task, setTask, phase, activeMode, remaining, results, start, cancel, reset, trialIndex, totalTrials } = runner;
+  const {
+    task, setTask, phase, activeMode, countdown, elapsed, canFinish,
+    results, start, finishTrial, cancel, reset, trialIndex, totalTrials,
+  } = runner;
 
   const inProgress = phase !== "idle" && phase !== "done";
 
@@ -54,12 +57,13 @@ export function TaskPanel({ runner }: { runner: UseTaskRunnerReturn }) {
           </TabsList>
         </Tabs>
         <p className="text-xs text-muted-foreground leading-snug">
-          {TASK_LABEL[task]} with your mouse — slowly and steadily. The system will
-          run <strong>3 trials</strong> (Off → PID → PID+Notch) and compare results.
+          {TASK_LABEL[task]} with your mouse — slowly and steadily. The system runs
+          {" "}<strong>3 trials</strong> (Off → PID → PID+Notch). Press
+          {" "}<kbd className="px-1.5 py-0.5 rounded bg-muted/60 border border-border/50 text-[10px] font-mono">Enter</kbd>
+          {" "}when done with each trial.
         </p>
       </div>
 
-      {/* Phase status */}
       {phase === "idle" && (
         <Button size="sm" onClick={start} className="w-full">
           <Play className="w-3.5 h-3.5 mr-1" /> Start trial sequence
@@ -69,7 +73,7 @@ export function TaskPanel({ runner }: { runner: UseTaskRunnerReturn }) {
       {phase === "countdown" && (
         <PhaseBox tone="primary">
           <div className="text-[11px] uppercase tracking-wider opacity-80">Get ready</div>
-          <div className="text-3xl font-bold tabular-nums">{remaining}</div>
+          <div className="text-3xl font-bold tabular-nums">{countdown}</div>
           <div className="text-xs opacity-80">First trial: <b>Controller Off</b></div>
         </PhaseBox>
       )}
@@ -79,15 +83,29 @@ export function TaskPanel({ runner }: { runner: UseTaskRunnerReturn }) {
           <div className="text-[11px] uppercase tracking-wider opacity-80">
             Trial {trialIndex + 1} of {totalTrials} · {MODE_LABEL[activeMode]}
           </div>
-          <div className="text-3xl font-bold tabular-nums">{remaining}s</div>
-          <div className="text-xs opacity-80">Keep tracing — don't let go of the mouse.</div>
+          <div className="text-3xl font-bold tabular-nums">{elapsed}s</div>
+          <div className="text-xs opacity-80">
+            Trace the path. Press{" "}
+            <kbd className="px-1.5 py-0.5 rounded bg-background/40 border border-border/50 text-[10px] font-mono">Enter</kbd>
+            {" "}when done.
+          </div>
+          <Button
+            size="sm"
+            className="mt-2 w-full"
+            onClick={finishTrial}
+            disabled={!canFinish}
+          >
+            {canFinish
+              ? `Finish trial — record ${MODE_LABEL[activeMode]}`
+              : `Wait ${Math.max(0, 3 - elapsed)}s before finishing…`}
+          </Button>
         </PhaseBox>
       )}
 
       {phase === "between" && (
         <PhaseBox tone="primary">
           <div className="text-[11px] uppercase tracking-wider opacity-80">Switching controller…</div>
-          <div className="text-3xl font-bold tabular-nums">{remaining}</div>
+          <div className="text-3xl font-bold tabular-nums">{countdown}</div>
           <div className="text-xs opacity-80">
             Next: <b>{MODE_LABEL[MODE_ORDER[trialIndex + 1]]}</b>
           </div>

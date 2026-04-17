@@ -21,11 +21,13 @@ export function SimulatorApp() {
     runner.phase === "idle"
       ? "Pick a task on the right and press Start to begin."
       : runner.phase === "countdown"
-      ? `Get ready — ${TASK_LABEL[runner.task]} (${runner.remaining}s)`
+      ? `Get ready — ${TASK_LABEL[runner.task]} (${runner.countdown})`
       : runner.phase === "running"
-      ? `${TASK_LABEL[runner.task]} — ${runner.remaining}s left`
+      ? runner.canFinish
+        ? `${TASK_LABEL[runner.task]} — press Enter when done (${runner.elapsed}s)`
+        : `${TASK_LABEL[runner.task]} — keep tracing… (${runner.elapsed}s)`
       : runner.phase === "between"
-      ? "Switching controller… keep your mouse on the field."
+      ? `Switching controller in ${runner.countdown}… keep your mouse on the field.`
       : "All trials complete — review the comparison on the right.";
 
   return (
