@@ -19,17 +19,16 @@ const TASK_LABEL: Record<TaskKind, string> = {
 };
 
 const MODE_ORDER: ControllerMode[] = ["off", "pid", "pid_notch"];
-const TRIAL_SECONDS = 12;
 const COUNTDOWN_SECONDS = 3;
-const BETWEEN_SECONDS = 2;
+const MIN_TRIAL_SECONDS = 3; // can't finish before this
 
 export interface TrialResult {
   mode: ControllerMode;
-  rmsTremor: number;        // raw → tremor error (px)
-  rmsFiltered: number;      // raw → filtered error (px) — what the surgeon delivers
-  maxFiltered: number;      // worst-case deviation (px)
-  pathDeviation: number;    // mean distance from filtered tip to target path (px)
-  attenuationPct: number;   // (1 - filtered/tremor)
+  rmsTremor: number;
+  rmsFiltered: number;
+  maxFiltered: number;
+  pathDeviation: number;
+  attenuationPct: number;
   samples: number;
 }
 
@@ -38,9 +37,12 @@ export interface UseTaskRunnerReturn {
   setTask: (t: TaskKind) => void;
   phase: TaskPhase;
   activeMode: ControllerMode | null;
-  remaining: number;
+  countdown: number;       // seconds left during countdown phase
+  elapsed: number;         // seconds elapsed during running phase
+  canFinish: boolean;      // true when running and >= MIN_TRIAL_SECONDS
   results: TrialResult[];
   start: () => void;
+  finishTrial: () => void; // user presses Enter to end current trial
   cancel: () => void;
   reset: () => void;
   trialIndex: number;
@@ -51,10 +53,21 @@ export function useTaskRunner(sim: UseSimulatorReturn): UseTaskRunnerReturn {
   const [task, setTaskState] = useState<TaskKind>("incision");
   const [phase, setPhase] = useState<TaskPhase>("idle");
   const [trialIndex, setTrialIndex] = useState(0);
-  const [remaining, setRemaining] = useState(0);
+  const [countdown, setCountdown] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
   const [results, setResults] = useState<TrialResult[]>([]);
   const trialBufferRef = useRef<SimSample[]>([]);
   const collectingRef = useRef(false);
+
+  // Refs that always mirror latest values (so handlers don't capture stale state)
+  const phaseRef = useRef(phase);
+  const trialIndexRef = useRef(trialIndex);
+  const elapsedRef = useRef(elapsed);
+  const simRef = useRef(sim);
+  phaseRef.current = phase;
+  trialIndexRef.current = trialIndex;
+  elapsedRef.current = elapsed;
+  simRef.current = sim;
 
   const setTask = useCallback((t: TaskKind) => {
     setTaskState(t);
@@ -62,39 +75,118 @@ export function useTaskRunner(sim: UseSimulatorReturn): UseTaskRunnerReturn {
     setResults([]);
     setPhase("idle");
     setTrialIndex(0);
+    setCountdown(0);
+    setElapsed(0);
   }, [sim]);
 
   const reset = useCallback(() => {
+    collectingRef.current = false;
+    trialBufferRef.current = [];
     setResults([]);
     setPhase("idle");
     setTrialIndex(0);
-    collectingRef.current = false;
-    trialBufferRef.current = [];
+    setCountdown(0);
+    setElapsed(0);
   }, []);
 
   const cancel = useCallback(() => {
     collectingRef.current = false;
     trialBufferRef.current = [];
     setPhase("idle");
-    setRemaining(0);
+    setCountdown(0);
+    setElapsed(0);
+  }, []);
+
+  // Begin a specific trial (mode index)
+  const beginTrial = useCallback((idx: number) => {
+    const mode = MODE_ORDER[idx];
+    simRef.current.setParams({ mode });
+    simRef.current.resetTrails();
+    trialBufferRef.current = [];
+    collectingRef.current = true;
+    setTrialIndex(idx);
+    setElapsed(0);
+    setPhase("running");
   }, []);
 
   const start = useCallback(() => {
-    sim.setParams({ pathKind: TASK_TO_PATH[task], tremorEnabled: true });
+    sim.setParams({ pathKind: TASK_TO_PATH[task], tremorEnabled: true, mode: "off" });
+    sim.resetTrails();
     setResults([]);
     setTrialIndex(0);
+    setCountdown(COUNTDOWN_SECONDS);
+    setElapsed(0);
     setPhase("countdown");
-    setRemaining(COUNTDOWN_SECONDS);
   }, [sim, task]);
 
-  // Sample-collection loop: runs at ~30 Hz during the active trial,
-  // appending any *new* samples that arrived from the simulator since last tick.
+  // User finishes current trial
+  const finishTrial = useCallback(() => {
+    if (phaseRef.current !== "running") return;
+    if (elapsedRef.current < MIN_TRIAL_SECONDS) return;
+
+    collectingRef.current = false;
+    const buf = trialBufferRef.current.slice();
+    const path = simRef.current.path;
+    const idx = trialIndexRef.current;
+    const result = summarize(MODE_ORDER[idx], buf, path);
+
+    setResults((prev) => [...prev, result]);
+
+    if (idx + 1 >= MODE_ORDER.length) {
+      setPhase("done");
+      setElapsed(0);
+    } else {
+      // Brief countdown before next trial
+      setCountdown(COUNTDOWN_SECONDS);
+      setElapsed(0);
+      setPhase("between");
+    }
+  }, []);
+
+  // ─── COUNTDOWN tick ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== "countdown") return;
+    const id = setInterval(() => {
+      setCountdown((c) => {
+        if (c > 1) return c - 1;
+        // reached 0 → start first trial on next tick
+        clearInterval(id);
+        beginTrial(0);
+        return 0;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [phase, beginTrial]);
+
+  // ─── BETWEEN-TRIAL countdown ────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== "between") return;
+    const id = setInterval(() => {
+      setCountdown((c) => {
+        if (c > 1) return c - 1;
+        clearInterval(id);
+        beginTrial(trialIndexRef.current + 1);
+        return 0;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [phase, beginTrial]);
+
+  // ─── RUNNING: count up elapsed seconds ──────────────────────────────────
+  useEffect(() => {
+    if (phase !== "running") return;
+    setElapsed(0);
+    const id = setInterval(() => setElapsed((e) => e + 1), 1000);
+    return () => clearInterval(id);
+  }, [phase]);
+
+  // ─── RUNNING: collect samples ───────────────────────────────────────────
   useEffect(() => {
     if (phase !== "running") return;
     let lastT = -Infinity;
     const id = setInterval(() => {
       if (!collectingRef.current) return;
-      const samples = sim.getRecentSamples();
+      const samples = simRef.current.getRecentSamples();
       for (const s of samples) {
         if (s.t > lastT) {
           trialBufferRef.current.push(s);
@@ -103,68 +195,29 @@ export function useTaskRunner(sim: UseSimulatorReturn): UseTaskRunnerReturn {
       }
     }, 33);
     return () => clearInterval(id);
-  }, [phase, sim]);
+  }, [phase]);
 
-  // Phase state machine driven by a 1-second tick.
+  // ─── Keyboard: Enter finishes current trial ─────────────────────────────
   useEffect(() => {
-    if (phase === "idle" || phase === "done") return;
-
-    const tick = setInterval(() => {
-      setRemaining((r) => {
-        if (r > 1) return r - 1;
-        // r === 1 → transition
-        finishPhase();
-        return 0;
-      });
-    }, 1000);
-    return () => clearInterval(tick);
-
-    function finishPhase() {
-      if (phase === "countdown") {
-        // Begin first trial
-        beginTrial(0);
-      } else if (phase === "running") {
-        completeTrial();
-      } else if (phase === "between") {
-        beginTrial(trialIndex + 1);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        if (phaseRef.current === "running" && elapsedRef.current >= MIN_TRIAL_SECONDS) {
+          e.preventDefault();
+          finishTrial();
+        }
       }
-    }
-
-    function beginTrial(idx: number) {
-      if (idx >= MODE_ORDER.length) return;
-      const mode = MODE_ORDER[idx];
-      sim.setParams({ mode });
-      sim.resetTrails();
-      trialBufferRef.current = [];
-      collectingRef.current = true;
-      setTrialIndex(idx);
-      setPhase("running");
-      setRemaining(TRIAL_SECONDS);
-    }
-
-    function completeTrial() {
-      collectingRef.current = false;
-      const buf = trialBufferRef.current.slice();
-      const path = sim.path;
-      const result = summarize(MODE_ORDER[trialIndex], buf, path);
-      setResults((prev) => [...prev, result]);
-
-      if (trialIndex + 1 >= MODE_ORDER.length) {
-        setPhase("done");
-        setRemaining(0);
-      } else {
-        setPhase("between");
-        setRemaining(BETWEEN_SECONDS);
-      }
-    }
-  }, [phase, trialIndex, sim]);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [finishTrial]);
 
   const activeMode: ControllerMode | null =
     phase === "running" ? MODE_ORDER[trialIndex] : null;
 
   return {
-    task, setTask, phase, activeMode, remaining, results,
-    start, cancel, reset,
+    task, setTask, phase, activeMode, countdown, elapsed,
+    canFinish: phase === "running" && elapsed >= MIN_TRIAL_SECONDS,
+    results, start, finishTrial, cancel, reset,
     trialIndex,
     totalTrials: MODE_ORDER.length,
   };
